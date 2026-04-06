@@ -1,0 +1,59 @@
+name: stylesync_clean
+description: AI-powered fashion styling assistant using camera scan and AI suggestions.
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # HTTP requests for Groq and HuggingFace APIs
+  http: ^1.2.0
+
+  # Camera for clothing scan
+  camera: ^0.10.5+9
+
+  # Image processing for color detection
+  image: ^4.1.7
+
+  # File path utilities
+  path_provider: ^2.1.2
+  path: ^1.9.0
+  image_picker: ^1.2.1
+  shared_preferences: ^2.5.5
+  flutter_local_notifications: ^21.0.0
+  timezone: ^0.11.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.1
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/avatar/male_model.png
+    - assets/avatar/female_model.png
+    - assets/icon/icon.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/icon.png"
+
+flutter_native_splash:
+  color: "#0F051D"
+  image: "assets/icon/icon.png"
+  android: true
+  ios: true
