@@ -1,16 +1,53 @@
-# stylesync_clean
+# 👗 StyleSync – Smart Outfit Recommendation App
 
-A new Flutter project.
+## 📌 Overview
+StyleSync is a Flutter-based mobile application designed to help users manage their wardrobe digitally and receive AI-based outfit suggestions. The app allows users to scan clothing items, detect dominant colors, and generate matching outfit recommendations for better styling decisions.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🚀 Features
 
-A few resources to get you started if this is your first Flutter project:
+- 🔐 **User Authentication**
+  - Login & Registration using local storage
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- 👕 **Wardrobe Management (CRUD)**
+  - Add, Edit, Delete outfits
+  - Store clothing items with details and images
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- 📸 **Clothing Scan**
+  - Capture clothing images using camera or gallery
+
+- 🎨 **Advanced Color Detection**
+  - Detect dominant clothing color using clustering logic
+
+- 🤖 **AI-Based Outfit Suggestions**
+  - Generate outfit combinations using external API
+
+- 🧠 **Suggestion History**
+  - Save and revisit previous outfit suggestions
+
+- 🔔 **Local Notifications**
+  - Reminders and alerts for users
+
+- 📱 **Navigation System**
+  - Bottom navigation bar and drawer navigation
+
+- 👤 **Profile & Settings**
+  - User profile display and logout functionality
+
+---
+
+## 🛠️ Tech Stack
+
+| Technology | Description |
+|-----------|------------|
+| Flutter | UI Framework |
+| Dart | Programming Language |
+| SharedPreferences | Local Storage |
+| Image Picker | Image Upload |
+| Camera | Capture Clothing Images |
+| Flutter Local Notifications | Notification System |
+
+---
+
+## 📂 Project Structure
