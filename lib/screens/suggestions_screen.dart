@@ -12,7 +12,6 @@ class SuggestionsScreen extends StatefulWidget {
   final String detectedColor;
   final String gender;
   final Map<String, List<String>> outfit;
-  final Uint8List? avatarBytes;
   final bool usedFallback;
 
   const SuggestionsScreen({
@@ -21,7 +20,6 @@ class SuggestionsScreen extends StatefulWidget {
     required this.detectedColor,
     required this.gender,
     required this.outfit,
-    this.avatarBytes,
     this.usedFallback = false,
   });
 
@@ -205,70 +203,6 @@ class _SuggestionsScreenState extends State<SuggestionsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── AVATAR SECTION ──────────────────────────────────
-                    Stack(
-                      children: [
-                        // Avatar image
-                        Container(
-                          width: double.infinity,
-                          height: 300,
-                          margin: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: const Color(0xFF2B0A3D),
-                          ),
-                          clipBehavior: Clip.hardEdge,
-                          child: widget.avatarBytes != null
-                              ? Image.memory(
-                                  widget.avatarBytes!,
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      widget.gender == 'Female'
-                                          ? Icons.person
-                                          : Icons.person_2,
-                                      color: Colors.white30,
-                                      size: 80,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Avatar generation failed\nor token not set',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: Colors.white38, fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                        ),
-
-                        // "CURRENT LOOK" badge
-                        Positioned(
-                          bottom: 16,
-                          left: 32,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.purpleAccent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Text(
-                              'CURRENT LOOK',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
                     const SizedBox(height: 16),
 
                     // Style title

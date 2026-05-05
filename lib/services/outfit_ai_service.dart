@@ -19,18 +19,92 @@ class OutfitAIService {
   /// Generates outfit suggestions for the given [clothingDescription] and [gender].
   ///
   /// Returns a Map with keys: topwear, bottomwear, footwear, accessories, jewellery.
+  static Map<String, List<String>> _getHardcodedSuggestions(String lowerDesc) {
+    if (lowerDesc.contains('topwear') || lowerDesc.contains('shirt') || lowerDesc.contains('top')) {
+      return {
+        'topwear': [],
+        'bottomwear': ['Blue Jeans', 'Black Trousers', 'Casual Shorts'],
+        'footwear': ['White Sneakers', 'Formal Shoes'],
+        'accessories': ['Watch', 'Sunglasses'],
+        'jewellery': [],
+      };
+    } else if (lowerDesc.contains('bottomwear') || lowerDesc.contains('pants') || lowerDesc.contains('jeans') || lowerDesc.contains('shorts') || lowerDesc.contains('trousers')) {
+      return {
+        'topwear': ['White T-shirt', 'Casual Shirt', 'Hoodie'],
+        'bottomwear': [],
+        'footwear': ['Sneakers', 'Loafers'],
+        'accessories': ['Bag', 'Watch'],
+        'jewellery': [],
+      };
+    } else if (lowerDesc.contains('dress') || lowerDesc.contains('gown')) {
+      return {
+        'topwear': [],
+        'bottomwear': [],
+        'footwear': ['Heels', 'Sandals'],
+        'accessories': ['Handbag', 'Earrings'],
+        'jewellery': [],
+      };
+    } else {
+      return {
+        'topwear': ['White T-shirt', 'Casual Shirt'],
+        'bottomwear': ['Blue Jeans', 'Black Trousers'],
+        'footwear': ['Sneakers', 'Formal Shoes'],
+        'accessories': ['Watch', 'Sunglasses'],
+        'jewellery': [],
+      };
+    }
+  }
+
   static Future<Map<String, List<String>>> getSuggestions({
     required String clothingDescription,
     required String gender,
   }) async {
+    String lowerDesc = clothingDescription.toLowerCase();
+    Map<String, List<String>> hardcoded = _getHardcodedSuggestions(lowerDesc);
+
+    String categoryRules = "";
+    if (lowerDesc.contains('topwear') || lowerDesc.contains('shirt') || lowerDesc.contains('top')) {
+      categoryRules = '''
+- Leave "topwear" empty.
+- Provide exactly 2 items for "bottomwear" (jeans, trousers, skirts, etc.).
+- Provide exactly 2 items for "footwear" (sneakers, shoes, heels, etc.).
+- Provide exactly 2 items for "accessories" (bags, sunglasses, etc.).
+- Provide exactly 2 items for "jewellery".
+''';
+    } else if (lowerDesc.contains('bottomwear') || lowerDesc.contains('pants') || lowerDesc.contains('jeans') || lowerDesc.contains('shorts') || lowerDesc.contains('trousers')) {
+      categoryRules = '''
+- Provide exactly 2 items for "topwear" (t-shirts, shirts, tops, etc.).
+- Leave "bottomwear" empty.
+- Provide exactly 2 items for "footwear".
+- Provide exactly 2 items for "accessories".
+- Provide exactly 2 items for "jewellery".
+''';
+    } else if (lowerDesc.contains('dress') || lowerDesc.contains('gown')) {
+      categoryRules = '''
+- Leave "topwear" and "bottomwear" empty.
+- Provide exactly 2 items for "footwear".
+- Provide exactly 2 items for "accessories".
+- Provide exactly 2 items for "jewellery".
+''';
+    } else {
+      categoryRules = '''
+- Provide exactly 2 items for "topwear".
+- Provide exactly 2 items for "bottomwear".
+- Provide exactly 2 items for "footwear".
+- Provide exactly 2 items for "accessories".
+- Provide exactly 2 items for "jewellery".
+''';
+    }
+
     final prompt = '''
 You are a professional fashion stylist.
 
 A $gender customer is wearing a "$clothingDescription".
 
 Suggest matching items to complete the outfit.
+$categoryRules
+
 Do NOT suggest the scanned clothing item again.
-Always provide exactly 2 specific items per category.
 Use short, descriptive names suitable for image search (e.g. "black heels", "gold necklace").
 Choose realistic, stylish, gender-appropriate items.
 
@@ -63,29 +137,28 @@ Return ONLY valid JSON in this exact format, no explanation:
 
       if (response.statusCode != 200) {
         debugPrint('  [Groq] ✗ Error ${response.statusCode}: ${response.body}');
-        throw Exception('Groq API error ${response.statusCode}: ${response.body}');
+        return hardcoded; // Return hardcoded on error instead of throwing
       }
 
       debugPrint('  [Groq] ✓ Status 200 — parsing response...');
       final decoded = jsonDecode(response.body);
       final content = decoded['choices'][0]['message']['content'] as String;
-      debugPrint('  [Groq] Raw content:\n$content');
-
-      // Extract JSON from response (strip any surrounding text)
+      
       final jsonStart = content.indexOf('{');
       final jsonEnd = content.lastIndexOf('}') + 1;
       if (jsonStart == -1 || jsonEnd <= jsonStart) {
-        throw Exception('No JSON found in Groq response');
+        return hardcoded; // Return hardcoded on parse error
       }
+      
       final jsonStr = content.substring(jsonStart, jsonEnd);
       final outfitJson = jsonDecode(jsonStr) as Map<String, dynamic>;
 
       final result = {
-        'topwear': _toStringList(outfitJson['topwear']),
-        'bottomwear': _toStringList(outfitJson['bottomwear']),
-        'footwear': _toStringList(outfitJson['footwear']),
-        'accessories': _toStringList(outfitJson['accessories']),
-        'jewellery': _toStringList(outfitJson['jewellery']),
+        'topwear': [...hardcoded['topwear']!, ..._toStringList(outfitJson['topwear'])].toSet().toList(),
+        'bottomwear': [...hardcoded['bottomwear']!, ..._toStringList(outfitJson['bottomwear'])].toSet().toList(),
+        'footwear': [...hardcoded['footwear']!, ..._toStringList(outfitJson['footwear'])].toSet().toList(),
+        'accessories': [...hardcoded['accessories']!, ..._toStringList(outfitJson['accessories'])].toSet().toList(),
+        'jewellery': [...hardcoded['jewellery']!, ..._toStringList(outfitJson['jewellery'])].toSet().toList(),
       };
 
       SuggestionHistoryService().saveHistory(SuggestionHistory(
@@ -97,7 +170,8 @@ Return ONLY valid JSON in this exact format, no explanation:
 
       return result;
     } catch (e) {
-      rethrow;
+      debugPrint('  [Groq] Exception caught, returning hardcoded suggestions: $e');
+      return hardcoded;
     }
   }
 

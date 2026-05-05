@@ -20,11 +20,18 @@ class AvatarGenerationService {
   /// [detectedClothing] is the scanned item description.
   ///
   /// Returns raw image bytes (PNG/JPEG) on success, or null on failure.
-  static Future<Uint8List?> generateAvatar({
+  static Future<dynamic> generateAvatar({
     required String gender,
     required Map<String, List<String>> outfit,
     required String detectedClothing,
   }) async {
+    const String fallbackUrl = 'https://api.dicebear.com/7.x/avataaars/png?seed=user';
+
+    if (_hfToken.isEmpty || _hfToken == 'YOUR_HUGGING_FACE_TOKEN_HERE' || _hfToken.contains('YOUR_')) {
+      debugPrint('  [Avatar] API Token is missing or placeholder. Returning fallback URL.');
+      return fallbackUrl;
+    }
+
     final prompt = _buildPrompt(gender: gender, outfit: outfit, detectedClothing: detectedClothing);
     debugPrint('  [Avatar] Prompt: $prompt');
 
@@ -78,10 +85,10 @@ class AvatarGenerationService {
       } else {
         debugPrint('  [Avatar] ✗ Error ${response.statusCode}: ${response.body}');
       }
-      return null;
+      return fallbackUrl;
     } catch (e) {
       debugPrint('  [Avatar] ✗ Exception: $e');
-      return null;
+      return fallbackUrl;
     }
   }
 

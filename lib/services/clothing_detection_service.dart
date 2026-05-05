@@ -8,50 +8,77 @@ class ClothingDetectionService {
     final bytes = await File(imagePath).readAsBytes();
     final original = img.decodeImage(bytes);
     if (original == null) {
-      return {'color': 'Grey', 'type': 'Topwear', 'description': 'Grey Topwear'};
+      return {'color': 'Grey', 'type': 'Bottomwear', 'description': 'Grey Bottomwear'};
     }
 
-    // 1. Resize captured image to smaller resolution (100x100)
-    final resized = img.copyResize(original, width: 100, height: 100);
-
-    // 2. Crop the center region (e.g. 50x50 from center) to reduce background influence
-    final cropped = img.copyCrop(resized, x: 25, y: 25, width: 50, height: 50);
-
-    // 4. Perform K-Means clustering (k = 3)
-    final dominantColorHsv = _getDominantColorKMeans(cropped, 3);
+    // 1. Always crop center 40% of the image before processing (Avoids gallery background noise)
+    int cropWidth = (original.width * 0.4).toInt();
+    int cropHeight = (original.height * 0.4).toInt();
+    int cropX = (original.width - cropWidth) ~/ 2;
+    int cropY = (original.height - cropHeight) ~/ 2;
     
-    // 6. Convert dominant HSV color to a color name
-    final colorName = _hsvToColorName(dominantColorHsv[0], dominantColorHsv[1], dominantColorHsv[2]);
+    final cropped = img.copyCrop(original, x: cropX, y: cropY, width: cropWidth, height: cropHeight);
 
-    // 7. Determine clothing type using simple heuristics
-    final double heightWidthRatio = original.height / original.width;
-    final double widthHeightRatio = original.width / original.height;
-    
-    String clothingType;
-    if (heightWidthRatio > 1.3) {
+    // 2. Resize cropped image to 50x50 before analysis (for speed)
+    final processingImage = img.copyResize(cropped, width: 50, height: 50);
+
+    // 3. Majority Pixel Voting for Color Detection
+    Map<String, int> colorCounts = {};
+    for (int y = 0; y < processingImage.height; y++) {
+      for (int x = 0; x < processingImage.width; x++) {
+        final p = processingImage.getPixel(x, y);
+        final hsv = _rgbToHsv(p.r.toInt(), p.g.toInt(), p.b.toInt());
+        final colorName = _hsvToColorName(hsv[0], hsv[1], hsv[2]);
+        colorCounts[colorName] = (colorCounts[colorName] ?? 0) + 1;
+      }
+    }
+
+    String dominantColor = 'Grey';
+    int maxCount = -1;
+    colorCounts.forEach((color, count) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominantColor = color;
+      }
+    });
+
+    // 4. Compute aspect ratio correctly: double ratio = height / width;
+    double ratio = original.height / original.width;
+    String clothingType = 'Bottomwear'; // Default fallback
+
+    if (ratio > 1.3) {
       clothingType = 'Dress';
-    } else if (widthHeightRatio > 1.3) {
-      clothingType = 'Shirt';
+    } else if (ratio < 0.8) {
+      clothingType = 'Topwear';
     } else {
+      clothingType = 'Bottomwear';
+    }
+
+    // 5. Add keyword override
+    final textToCheck = imagePath.toLowerCase();
+    if (textToCheck.contains('jeans') || textToCheck.contains('pants') || 
+        textToCheck.contains('trousers') || textToCheck.contains('shorts')) {
+      clothingType = 'Bottomwear';
+    } else if (textToCheck.contains('dress') || textToCheck.contains('gown')) {
+      clothingType = 'Dress';
+    } else if (textToCheck.contains('shirt') || textToCheck.contains('t-shirt') || textToCheck.contains('top')) {
       clothingType = 'Topwear';
     }
 
-    // 8. Generate clothing description
-    final description = '$colorName $clothingType';
+    final description = '$dominantColor $clothingType';
 
-    // 10. Add debug logs
-    debugPrint('  [ClothingDetection] Dominant Color: $colorName');
-    debugPrint('  [ClothingDetection] Clothing Type: $clothingType');
+    debugPrint('  [ClothingDetection] Dominant Color: $dominantColor');
+    debugPrint('  [ClothingDetection] Clothing Type: $clothingType (Ratio: $ratio)');
     debugPrint('  [ClothingDetection] Final Description: $description');
 
     return {
-      'color': colorName,
+      'color': dominantColor,
       'type': clothingType,
       'description': description,
     };
   }
 
-  // 3. Convert RGB pixels to HSV color space
+  // Convert RGB pixels to HSV color space
   static List<double> _rgbToHsv(int r, int g, int b) {
     final rNorm = r / 255.0;
     final gNorm = g / 255.0;
@@ -77,118 +104,21 @@ class ClothingDetectionService {
     return [h, s, mx]; // Hue [0..360], Saturation [0..1], Value [0..1]
   }
 
-  static List<double> _getDominantColorKMeans(img.Image image, int k) {
-    List<List<double>> pixels = [];
-    for (int y = 0; y < image.height; y++) {
-      for (int x = 0; x < image.width; x++) {
-        final pixel = image.getPixel(x, y);
-        // Step 3 applied per pixel
-        final hsv = _rgbToHsv(pixel.r.toInt(), pixel.g.toInt(), pixel.b.toInt());
-        
-        // Minor filtering for absolute white or absolute black background outliers
-        if (hsv[2] > 0.95 && hsv[1] < 0.05) continue;
-        if (hsv[2] < 0.05) continue;
-        
-        pixels.add(hsv);
-      }
-    }
-    
-    if (pixels.isEmpty) return [0, 0, 0]; // Default to black
-
-    List<List<double>> centroids = [];
-    final rand = Random();
-    for (int i = 0; i < k; i++) {
-      centroids.add(pixels[rand.nextInt(pixels.length)]);
-    }
-
-    List<int> assignments = List.filled(pixels.length, 0);
-    bool changed = true;
-    int maxIters = 10; // Cap passes for speed
-    
-    while (changed && maxIters-- > 0) {
-      changed = false;
-      List<List<double>> newCentroids = List.generate(k, (_) => [0.0, 0.0, 0.0]);
-      List<int> counts = List.filled(k, 0);
-
-      // Assign pixels to closest centroid
-      for (int i = 0; i < pixels.length; i++) {
-        final p = pixels[i];
-        double bestDist = double.infinity;
-        int bestK = 0;
-        
-        for (int j = 0; j < k; j++) {
-          final c = centroids[j];
-          // Account for circular hue distance + standard value/saturation difference
-          double hDist = (p[0] - c[0]).abs();
-          if (hDist > 180) hDist = 360 - hDist; 
-          
-          final currentDist = hDist + (p[1] - c[1]).abs() * 100 + (p[2] - c[2]).abs() * 100;
-          if (currentDist < bestDist) {
-            bestDist = currentDist;
-            bestK = j;
-          }
-        }
-        
-        if (assignments[i] != bestK) {
-          changed = true;
-          assignments[i] = bestK;
-        }
-        
-        newCentroids[bestK][0] += p[0];
-        newCentroids[bestK][1] += p[1];
-        newCentroids[bestK][2] += p[2];
-        counts[bestK]++;
-      }
-
-      // Update centroids
-      for (int j = 0; j < k; j++) {
-        if (counts[j] > 0) {
-          centroids[j] = [
-            newCentroids[j][0] / counts[j],
-            newCentroids[j][1] / counts[j],
-            newCentroids[j][2] / counts[j],
-          ];
-        } else {
-          centroids[j] = pixels[rand.nextInt(pixels.length)]; // Respawn empty cluster
-        }
-      }
-    }
-
-    // 5. Find the largest cluster
-    List<int> finalCounts = List.filled(k, 0);
-    for (int a in assignments) {
-      finalCounts[a]++;
-    }
-
-    int largestClusterIndex = 0;
-    int maxCount = 0;
-    for (int i = 0; i < k; i++) {
-      if (finalCounts[i] > maxCount) {
-        maxCount = finalCounts[i];
-        largestClusterIndex = i;
-      }
-    }
-
-    return centroids[largestClusterIndex];
-  }
-
-  // 6. Classify strict heuristic color ranges
+  // Apply explicit improved thresholds
   static String _hsvToColorName(double h, double s, double v) {
     if (v < 0.2) return 'Black';
-    if (s < 0.15 && v > 0.8) return 'White';
-    if (s < 0.2) return 'Grey';
+    if (v > 0.85 && s < 0.2) return 'White';
+    if (s < 0.25) return 'Grey';
     
-    if (h >= 345 || h < 15) return 'Red';
-    if (h < 45) {
-      if (s > 0.3 && v < 0.6) return 'Brown';
-      return 'Orange';
-    }
-    if (h < 75) return 'Yellow';
-    if (h < 150) return 'Green';
-    if (h < 260) return 'Blue';
-    if (h < 300) return 'Purple';
-    if (h < 345) return 'Pink';
+    if (h < 15 || h > 345) return 'Red';
+    if (h >= 15 && h <= 35) return 'Orange';
+    if (h > 35 && h <= 65) return 'Yellow';
+    if (h > 65 && h <= 170) return 'Green';
+    if (h > 170 && h <= 260) return 'Blue';
+    if (h > 260 && h <= 290) return 'Purple';
+    if (h > 290 && h <= 345) return 'Pink';
 
     return 'Grey';
   }
 }
+

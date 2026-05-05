@@ -27,14 +27,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen>
   String _statusText = 'Analyzing color compatibility...';
   double _progress = 0.0;
 
-  // ── Fallback suggestions used when Groq API fails ──────────────────────────
-  static const Map<String, List<String>> _fallbackSuggestions = {
-    'topwear': ['White linen shirt', 'Beige polo shirt'],
-    'bottomwear': ['Beige chinos', 'Light grey trousers'],
-    'footwear': ['White sneakers', 'Tan loafers'],
-    'accessories': ['Brown leather belt', 'Classic sunglasses'],
-    'jewellery': ['Silver watch', 'Simple bracelet'],
-  };
+
 
   @override
   void initState() {
@@ -78,7 +71,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen>
     // ── STEP 2: Groq API — Outfit Suggestions ─────────────────────────────
     _setStatus('Generating outfit suggestions with AI...', 0.35);
 
-    Map<String, List<String>> outfit = _fallbackSuggestions;
+    Map<String, List<String>> outfit = {};
     bool usedFallback = false;
 
     try {
@@ -96,35 +89,27 @@ class _AnalyzeScreenState extends State<AnalyzeScreen>
     } catch (e) {
       debugPrint('⚠ Groq API failed: $e — using fallback suggestions');
       usedFallback = true;
-    }
-
-    // ── STEP 3: HuggingFace — Avatar Generation ───────────────────────────
-    _setStatus('Generating your full-body avatar...', 0.65);
-
-    dynamic avatarBytes;
-
-    try {
-      debugPrint('═══ AVATAR GENERATION ═══');
-      debugPrint('  Gender   : ${widget.gender}');
-      debugPrint('  Clothing : $clothingDescription');
-
-      avatarBytes = await AvatarGenerationService.generateAvatar(
-        gender: widget.gender,
-        outfit: outfit,
-        detectedClothing: clothingDescription,
-      );
-
-      if (avatarBytes != null) {
-        debugPrint('✓ Avatar generated — ${avatarBytes.length} bytes');
+      
+      String lowerDesc = clothingDescription.toLowerCase();
+      outfit = {
+        'footwear': ['White sneakers', 'Tan loafers'],
+        'accessories': ['Brown leather belt', 'Classic sunglasses'],
+        'jewellery': ['Silver watch', 'Simple bracelet'],
+      };
+      
+      if (lowerDesc.contains('topwear') || lowerDesc.contains('shirt') || lowerDesc.contains('top')) {
+         outfit['bottomwear'] = ['Beige chinos', 'Light grey trousers'];
+      } else if (lowerDesc.contains('bottomwear') || lowerDesc.contains('pants') || lowerDesc.contains('jeans') || lowerDesc.contains('shorts') || lowerDesc.contains('trousers')) {
+         outfit['topwear'] = ['White linen shirt', 'Beige polo shirt'];
+      } else if (lowerDesc.contains('dress') || lowerDesc.contains('gown')) {
+         // nothing to add
       } else {
-        debugPrint('⚠ Avatar generation returned null (token missing or model error)');
+         outfit['topwear'] = ['White linen shirt', 'Beige polo shirt'];
+         outfit['bottomwear'] = ['Beige chinos', 'Light grey trousers'];
       }
-    } catch (e) {
-      debugPrint('⚠ Avatar generation failed: $e');
-      avatarBytes = null;
     }
 
-    // ── STEP 4: Navigate to SuggestionsScreen ────────────────────────────
+    // ── STEP 3: Navigate to SuggestionsScreen ────────────────────────────
     _setStatus(
       usedFallback ? 'Using fallback suggestions.' : 'Analysis complete!',
       1.0,
@@ -132,7 +117,6 @@ class _AnalyzeScreenState extends State<AnalyzeScreen>
 
     debugPrint('═══ PIPELINE COMPLETE ═══');
     debugPrint('  Fallback used : $usedFallback');
-    debugPrint('  Avatar loaded : ${avatarBytes != null}');
 
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
@@ -145,7 +129,6 @@ class _AnalyzeScreenState extends State<AnalyzeScreen>
           detectedColor: detectedColor,
           gender: widget.gender,
           outfit: outfit,
-          avatarBytes: avatarBytes,
           usedFallback: usedFallback,
         ),
       ),
